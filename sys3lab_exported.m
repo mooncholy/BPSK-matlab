@@ -3,6 +3,8 @@ classdef sys3lab_exported < matlab.apps.AppBase
     % Properties that correspond to app components
     properties (Access = public)
         UIFigure                 matlab.ui.Figure
+        SNRLabel                 matlab.ui.control.Label
+        noise_value              matlab.ui.control.Spinner
         psk_legend               matlab.ui.control.CheckBox
         carrier_legend           matlab.ui.control.CheckBox
         bits_legend              matlab.ui.control.CheckBox
@@ -61,7 +63,33 @@ classdef sys3lab_exported < matlab.apps.AppBase
 
         end
 
+        function space_signal(app)
+            % Read bitstream data:
+            bitstream_txt = app.bitstream_edit.Value;
+            bitstream_digits = split(bitstream_txt, ' ');
+            bitstream = str2double(bitstream_digits);
+            
+            % Modulate the input bit sequence using PSK
+            txSig = pskmod(bitstream,2);
 
+            % Add noise to the signal
+            SNRdB = app.noise_value.Value; % Signal-to-Noise Ratio in dB
+            rxSig = awgn(txSig,SNRdB);
+
+            % clear previous plot
+            cla(app.UIAxes);
+
+            % Plot the data
+            hold(app.UIAxes, 'on');
+            plot(app.UIAxes, real(txSig), imag(txSig), 'o');
+            plot(app.UIAxes,real(rxSig), imag(rxSig), 'x');
+            title(app.UIAxes,'PSK Signal Constellation Diagram');
+            xlabel(app.UIAxes,'I Component');
+            ylabel(app.UIAxes,'Q Component');
+            grid(app.UIAxes, 'on');
+            axis(app.UIAxes,[-2 2 -2 2])
+            legend(app.UIAxes, 'Transmitted Signal', 'Recieved Signal');
+        end
     end
 
 
@@ -70,6 +98,14 @@ classdef sys3lab_exported < matlab.apps.AppBase
 
         % Button pushed function: time_plots
         function time_plotsButtonPushed(app, event)
+            app.noise_value.Visible = 'off';
+            app.SNRLabel.Visible = 'off';
+            app.cFreq.Visible = 'on';
+            app.freqScale.Visible = 'on';
+            app.psk_legend.Visible = 'on';
+            app.carrier_legend.Visible = 'on';
+            app.bits_legend.Visible = 'on';
+
             % Read bitstream data:
             bitstream_txt = app.bitstream_edit.Value;
             bitstream_digits = split(bitstream_txt, ' ');
@@ -114,31 +150,19 @@ classdef sys3lab_exported < matlab.apps.AppBase
 
         % Button pushed function: space_const
         function space_constButtonPushed(app, event)
-            % Read bitstream data:
-            bitstream_txt = app.bitstream_edit.Value;
-            bitstream_digits = split(bitstream_txt, ' ');
-            bitstream = str2double(bitstream_digits);
+            app.noise_value.Visible = 'on';
+            app.SNRLabel.Visible = 'on';
+            app.cFreq.Visible = 'off';
+            app.freqScale.Visible = 'off';
+            app.psk_legend.Visible = 'off';
+            app.carrier_legend.Visible = 'off';
+            app.bits_legend.Visible = 'off';
+            space_signal(app);
+        end
 
-            % Modulate the input bit sequence using PSK
-            txSig = pskmod(bitstream,2);
-
-            % Add noise to the signal
-            SNRdB = 10; % Signal-to-Noise Ratio in dB
-            rxSig = awgn(txSig,SNRdB);
-
-            % clear previous plot
-            cla(app.UIAxes);
-
-            % Plot the data
-            hold(app.UIAxes, 'on');
-            plot(app.UIAxes, real(txSig), imag(txSig), 'o');
-            plot(app.UIAxes,real(rxSig), imag(rxSig), 'x');
-            title(app.UIAxes,'PSK Signal Constellation Diagram');
-            xlabel(app.UIAxes,'I Component');
-            ylabel(app.UIAxes,'Q Component');
-            grid(app.UIAxes, 'on');
-            axis(app.UIAxes,[-2 2 -2 2])
-            legend(app.UIAxes, 'Transmitted Signal', 'Recieved Signal');
+        % Value changed function: noise_value
+        function noise_valueValueChanged(app, event)
+            space_signal(app);
         end
     end
 
@@ -159,7 +183,7 @@ classdef sys3lab_exported < matlab.apps.AppBase
             xlabel(app.UIAxes, 'time')
             ylabel(app.UIAxes, 'signal')
             zlabel(app.UIAxes, 'Z')
-            app.UIAxes.Position = [9 192 640 280];
+            app.UIAxes.Position = [9 192 625 280];
 
             % Create BitstreamEditFieldLabel
             app.BitstreamEditFieldLabel = uilabel(app.UIFigure);
@@ -173,6 +197,7 @@ classdef sys3lab_exported < matlab.apps.AppBase
 
             % Create CarrierfreqLabel
             app.CarrierfreqLabel = uilabel(app.UIFigure);
+            app.CarrierfreqLabel.Tag = 'Clabel';
             app.CarrierfreqLabel.HorizontalAlignment = 'right';
             app.CarrierfreqLabel.Position = [8 82 69 22];
             app.CarrierfreqLabel.Text = 'Carrier freq:';
@@ -196,7 +221,7 @@ classdef sys3lab_exported < matlab.apps.AppBase
             % Create space_const
             app.space_const = uibutton(app.UIFigure, 'push');
             app.space_const.ButtonPushedFcn = createCallbackFcn(app, @space_constButtonPushed, true);
-            app.space_const.Position = [378 25 164 23];
+            app.space_const.Position = [361 25 164 23];
             app.space_const.Text = 'Space Constellation';
 
             % Create bits_legend
@@ -222,6 +247,25 @@ classdef sys3lab_exported < matlab.apps.AppBase
             app.psk_legend.Text = 'PSK waveform';
             app.psk_legend.Position = [410 163 101 22];
             app.psk_legend.Value = true;
+
+            % Create noise_value
+            app.noise_value = uispinner(app.UIFigure);
+            app.noise_value.Step = 10;
+            app.noise_value.RoundFractionalValues = 'on';
+            app.noise_value.ValueDisplayFormat = '%.0f';
+            app.noise_value.ValueChangedFcn = createCallbackFcn(app, @noise_valueValueChanged, true);
+            app.noise_value.HorizontalAlignment = 'center';
+            app.noise_value.Visible = 'off';
+            app.noise_value.Position = [565 25 68 22];
+            app.noise_value.Value = 10;
+
+            % Create SNRLabel
+            app.SNRLabel = uilabel(app.UIFigure);
+            app.SNRLabel.Tag = 'SNRlabel';
+            app.SNRLabel.HorizontalAlignment = 'right';
+            app.SNRLabel.Visible = 'off';
+            app.SNRLabel.Position = [530 25 30 22];
+            app.SNRLabel.Text = 'SNR';
 
             % Show the figure after all components are created
             app.UIFigure.Visible = 'on';
